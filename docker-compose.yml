@@ -1,16 +1,33 @@
+x-app-env: &app-env
+  SECRET_KEY: ${SECRET_KEY}
+  DEBUG: ${DEBUG:-0}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+  DB_NAME: ${DB_NAME:-wc_system_default}
+  DB_NAME_ARCHIVE: ${DB_NAME_ARCHIVE:-wc_system_archive}
+  DB_USER: ${DB_USER:-root}
+  DB_PASSWORD: ${DB_PASSWORD}
+  DB_HOST: ${DB_HOST:-db}
+  DB_PORT: ${DB_PORT:-3306}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/3}
+  CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/4}
+  WFM_BASE_URL: ${WFM_BASE_URL}
+  SYNC_SERVICE_TOKEN: ${SYNC_SERVICE_TOKEN}
+  WFM_HTTP_TIMEOUT: ${WFM_HTTP_TIMEOUT:-30}
+
 services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123}
-      MYSQL_DATABASE: ${DB_NAME:-wc_system_default}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-password123}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -22,8 +39,8 @@ services:
 
   web:
     build: .
-    env_file: .env
     environment:
+      <<: *app-env
       RUN_MIGRATIONS: "1"
     depends_on:
       db:
@@ -36,7 +53,8 @@ services:
 
   worker:
     build: .
-    env_file: .env
+    environment:
+      <<: *app-env
     depends_on:
       - db
       - redis
@@ -44,7 +62,8 @@ services:
 
   beat:
     build: .
-    env_file: .env
+    environment:
+      <<: *app-env
     depends_on:
       - db
       - redis
