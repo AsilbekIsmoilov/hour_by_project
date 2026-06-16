@@ -8,7 +8,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "3306:3306"
+      - "3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-password123}"]
       interval: 5s
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6379"
 
   web:
     build: .
@@ -32,7 +32,7 @@ services:
         condition: service_started
     command: uvicorn core.asgi:application --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "4020:8000"
 
   worker:
     build: .
