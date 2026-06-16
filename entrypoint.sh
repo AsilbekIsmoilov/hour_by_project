@@ -1,26 +1,24 @@
-#!/bin/sh
+#!/usr/bin/env sh
 set -e
 
-echo "Waiting for MySQL at ${DB_HOST}:${DB_PORT:-3306}..."
-while ! nc -z "${DB_HOST}" "${DB_PORT:-3306}"; do
-  sleep 1
-done
-echo "MySQL is up."
-
 if [ "${RUN_MIGRATIONS}" = "1" ]; then
-  echo "Running migrations (default)..."
+  echo "Migrating default DB..."
   python manage.py migrate --noinput
 
-  echo "Running migrations (archive)..."
+  echo "Migrating archive DB..."
   python manage.py migrate --database=archive --noinput
 
-  python manage.py collectstatic --noinput || true
+  echo "Collecting static..."
+  python manage.py collectstatic --noinput
 
-  echo "Seeding initial data..."
-  python manage.py seed_initial_data || echo "seed_initial_data: skipped/failed"
+  echo "Ensuring superuser (admin/123)..."
+  python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(username='admin').exists() or U.objects.create_superuser('admin','','123')"
 
-  echo "Ensuring superuser (admin)..."
-  python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); U.objects.filter(username='admin').exists() or U.objects.create_superuser(username='admin', email='admin@example.com', password='123')" || true
+  echo "Running daily_runner (1/2)..."
+  python daily_runner.py
+
+  echo "Running daily_runner (2/2)..."
+  python daily_runner.py
 fi
 
 exec "$@"
