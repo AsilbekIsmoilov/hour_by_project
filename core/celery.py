@@ -14,10 +14,10 @@ app.autodiscover_tasks()
 
 
 app.conf.beat_schedule = {
-    "attendance-every-10-sec": {
-        "task": "attendance.tasks.attendance_worker",
-        "schedule": 10.0,
-    },
+    # "attendance-every-10-sec": {
+    #     "task": "attendance.tasks.attendance_worker",
+    #     "schedule": 10.0,
+    # },
     "daily-pipeline": {
         "task": "hourly_locks.daily_pipeline",
         "schedule": crontab(hour=9, minute=0),

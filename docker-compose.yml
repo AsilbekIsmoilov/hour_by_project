@@ -2,8 +2,8 @@ services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-password123}
-      MYSQL_DATABASE: ${DB_NAME:-project1}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123}
+      MYSQL_DATABASE: ${DB_NAME:-wc_system_default}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql:ro
