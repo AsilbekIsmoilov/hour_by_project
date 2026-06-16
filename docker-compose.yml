@@ -44,14 +44,16 @@ services:
       RUN_MIGRATIONS: "1"
     volumes:
       - /home/user/Projects/wc_system/creds.json:/app/creds.json:ro
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
     command: uvicorn core.asgi:application --host 0.0.0.0 --port 8000
-    ports:
-      - "4020:8000"
+    expose:
+      - "8000"
 
   worker:
     build: .
