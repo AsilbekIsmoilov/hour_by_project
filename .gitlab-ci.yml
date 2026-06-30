@@ -40,23 +40,32 @@ build-prod:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# ВРЕМЕННО: грепаем логи ТЕКУЩЕГО (ещё работающего) web ДО того как deploy его
-# пересоздаст (down). Здесь будет traceback реального 500 из браузера.
-logs-prod:
-  stage: build
-  image: docker:25
-  tags: [wfm_prod]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  script:
-    - echo "===== последние логи web (tail 150) ====="
-    - docker compose logs --tail=150 web 2>&1 || true
-    - echo "===== СЕЙЧАС вызови 500 в браузере (admin/123). Слежу 80 секунд LIVE ====="
-    - timeout 80 docker compose logs --tail=0 --follow web 2>&1 || true
-    - echo "===== конец слежения (если выше пусто — 500 не успели вызвать) ====="
-
 deploy-prod:
   extends: .deploy_template
   tags: [wfm_prod]
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
+
+# РУЧНОЙ полный сброс прод-БД (кнопка ▶ в GitLab). НЕ выполняется автоматически.
+# DROP+CREATE обе БД -> migrate с нуля -> seed -> superuser admin/123 -> restart.
+# Чинит 500 на логине, если текущая БД в «грязном»/частичном состоянии.
+reset-db-prod:
+  stage: deploy
+  image: docker:25
+  tags: [wfm_prod]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: true
+  script:
+    - echo "===== DROP + CREATE wc_system_default и wc_system_archive ====="
+    - docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "DROP DATABASE IF EXISTS wc_system_default; CREATE DATABASE wc_system_default CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; DROP DATABASE IF EXISTS wc_system_archive; CREATE DATABASE wc_system_archive CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"'
+    - echo "===== migrate с нуля (default + archive) ====="
+    - docker compose exec -T web python manage.py migrate --noinput
+    - docker compose exec -T web python manage.py migrate --database=archive --noinput
+    - echo "===== seed (смены/типы/политики/активный цикл) ====="
+    - docker compose exec -T web python manage.py seed_initial_data
+    - echo "===== superuser admin / 123 ====="
+    - docker compose exec -T web python manage.py shell -c "from django.contrib.auth import get_user_model; U=get_user_model(); u,_=U.objects.get_or_create(username='admin', defaults={'is_staff': True, 'is_superuser': True, 'role': 'admin'}); u.is_staff=True; u.is_superuser=True; u.role='admin'; u.set_password('123'); u.save(); print('superuser admin готов')"
+    - echo "===== restart web/worker/beat (свежие соединения с новой БД) ====="
+    - docker compose restart web worker beat
