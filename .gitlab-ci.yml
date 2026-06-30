@@ -11,12 +11,23 @@ variables:
 .build_template:
   stage: build
   image: docker:25
+  # Авто-повтор при сбоях runner'а (в т.ч. таймаут pull образа docker:25).
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
   script:
     - docker compose build
 
 .deploy_template:
   stage: deploy
   image: docker:25
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
   script:
     - docker compose down
     - docker compose up -d
