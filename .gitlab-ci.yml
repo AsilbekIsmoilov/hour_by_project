@@ -7,11 +7,9 @@ variables:
   DOCKER_HOST: "unix:///var/run/docker.sock"
   GIT_CLEAN_FLAGS: -ffdx
 
-# ---------- TEMPLATES ----------
 .build_template:
   stage: build
   image: docker:25
-  # Авто-повтор при сбоях runner'а (в т.ч. таймаут pull образа docker:25).
   retry:
     max: 2
     when:
@@ -31,13 +29,11 @@ variables:
   script:
     - docker compose down
     - docker compose up -d --wait
-    # БД уже существуют (созданы на сервере). Прогоняем миграции и гарантируем админа.
     - docker compose exec -T web python manage.py migrate --noinput
     - docker compose exec -T web python manage.py migrate --database=archive --noinput
     - "docker compose exec -T web python manage.py shell -c \"from django.contrib.auth import get_user_model; U=get_user_model(); u,_=U.objects.get_or_create(username='admin', defaults={'is_staff':True,'is_superuser':True,'role':'admin'}); u.is_staff=True; u.is_superuser=True; u.role='admin'; u.set_password('123'); u.save(); print('superuser admin ready')\""
     - docker image prune -f
 
-# ---------- PROD ----------
 build-prod:
   extends: .build_template
   tags: [wfm_prod]
@@ -49,3 +45,23 @@ deploy-prod:
   tags: [wfm_prod]
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Просмотр логов прод-приложения (traceback'и 500 и т.п.).
+# Запускается вручную (кнопка ▶) на pipeline ветки main.
+# Порядок: воспроизведите ошибку в браузере -> запустите этот job.
+logs-prod:
+  stage: deploy
+  image: docker:25
+  tags: [wfm_prod]
+  needs: []
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: true
+  script:
+    - echo "=== logs/errors.log (полные traceback'и 5xx) ==="
+    - docker compose exec -T web sh -c 'cat logs/errors.log 2>/dev/null || echo "(файл logs/errors.log пуст или отсутствует)"'
+    - echo "=== консольные логи web (tail 250) ==="
+    - docker compose logs --tail=250 web || echo "(не удалось получить логи web)"
+    - echo "=== логи nginx (tail 40) ==="
+    - docker compose logs --tail=40 nginx || echo "(не удалось получить логи nginx)"
