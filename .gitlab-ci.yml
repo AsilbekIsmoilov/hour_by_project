@@ -66,3 +66,9 @@ diag-prod:
     - docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "SHOW DATABASES;"'
     - echo "=== к чему подключено приложение + тест логина ==="
     - docker compose exec -T web python scripts/diag_conn.py
+    - echo "=== ПОЛНЫЙ HTTP-путь через nginx (nginx -> web) ==="
+    - docker compose exec -T web python scripts/diag_nginx.py
+    - echo "=== последние логи nginx ==="
+    - docker compose logs --tail=40 nginx
+    - echo "=== последние логи web ==="
+    - docker compose logs --tail=40 web
