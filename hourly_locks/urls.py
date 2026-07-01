@@ -21,6 +21,7 @@ from .views import (
     OperatorViewSet,
     RequestTypeRuleViewSet,
     RetroactiveCompensationCheckView,
+    RunDailyPipelineView,
     ShiftViewSet,
     SystemPolicyViewSet,
     TransferViewSet,
@@ -102,6 +103,13 @@ urlpatterns = [
         "api/v1/compensations/retroactive-check/",
         RetroactiveCompensationCheckView.as_view(),
         name="retroactive-check",
+    ),
+
+    # Ручной запуск ежедневного конвейера (daily_runner) через Celery.
+    path(
+        "api/v1/run-daily-pipeline/",
+        RunDailyPipelineView.as_view(),
+        name="run-daily-pipeline",
     ),
 
     # OpenAPI / Swagger

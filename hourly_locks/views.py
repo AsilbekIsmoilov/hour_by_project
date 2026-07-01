@@ -1073,3 +1073,46 @@ class EventLogViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = EventLogFilter
     pagination_class = LargePagination
     ordering = ["-timestamp"]
+
+
+class RunDailyPipelineView(APIView):
+    """Ручной запуск ежедневного конвейера (daily_runner.run) через Celery.
+
+    POST /api/v1/run-daily-pipeline/
+        body (необязательно):
+          {"date": "YYYY-MM-DD", "skip_sheets": false}
+        По умолчанию — за вчера (как штатный прогон).
+
+    Задача уходит в Celery-воркер (не блокирует HTTP), логи — в логах воркера.
+    Возвращает id задачи. Доступ: только admin/manager.
+    """
+    permission_classes = [IsManagerOrAdmin]
+
+    def post(self, request):
+        from .tasks import daily_pipeline_task
+
+        raw_date = request.data.get("date")
+        target_iso = None
+        if raw_date:
+            try:
+                target_iso = date.fromisoformat(str(raw_date)).isoformat()
+            except ValueError:
+                return Response(
+                    {"detail": "Noto'g'ri date format (kerak: YYYY-MM-DD)"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        skip_sheets = bool(request.data.get("skip_sheets", False))
+
+        async_result = daily_pipeline_task.delay(
+            target_date_iso=target_iso,
+            skip_sheets=skip_sheets,
+        )
+        return Response(
+            {
+                "detail": "Daily pipeline ishga tushirildi (Celery)",
+                "task_id": async_result.id,
+                "target_date": target_iso or "kecha (default)",
+                "skip_sheets": skip_sheets,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
